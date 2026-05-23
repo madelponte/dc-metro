@@ -1,10 +1,11 @@
 Forked from [metro-sign](https://github.com/metro-sign/dc-metro) to add the following features:
-- allow multiple train stations
-- allow buses (each stop you want to track needs the regional code from [this map](https://opendata.dc.gov/datasets/DCGIS::metro-bus-stops/explore?location=38.923580%2C-77.046055%2C10))
+- Support for Matrixportal S3 baords
+- Allow multiple train stations
+- Allow buses (each stop you want to track needs the regional code from [this map](https://opendata.dc.gov/datasets/DCGIS::metro-bus-stops/explore?location=38.923580%2C-77.046055%2C10))
 - Use a "page" system to mix and match any number of trains/buses
-- optionally show metro rail and bus incidents
-- implement a "walking distance" modifier to ignore trains/buses you cannot get to in time.
-- Errors/Crashes will display on the board
+- Optionally show metro rail and bus incidents
+- Implement a "walking distance" modifier to ignore trains/buses you cannot get to in time.
+- Errors/Crashes will (hopefully) display on the board
 - Updated to CircuitPython 10 and corresponding libraries.
 
 Thanks to:
@@ -21,6 +22,17 @@ aio_key = "[your api key]"
 timezone = "America/New_York"
 ```
 
+The original guide used a Matrixportal M4. If you're following this guide today then buy the Matrixportal S3. It's cheaper and more powerful. The M4 cannot reliably handle real-time incidents from GTFS because there is too much data. Buses for sure won't work. You could make train incidents work by increasing `CIRCUITPY_PYSTACK_SIZE` in your settings.toml. But if there are a lot of train incidents it could crash your board. The S3 doesn't have these problems. So in summary:
+- If using an M4:
+    - Set `use_gtfs_rt_for_rail_incidents` to `False` in your config file (unless you increase `CIRCUITPY_PYSTACK_SIZE` to something like 2048. Crashes could still occur)
+    - Set `use_gtfs_rt_for_bus_incidents` to `False` in your config file
+    - With these being `False`, the board will use WMATAs incident API instead of the GTFS endpoint. In my experience it has less accurate data
+- If using an S3:
+    - Set `use_gtfs_rt_for_rail_incidents` to `True` in your config file
+    - Set `use_gtfs_rt_for_bus_incidents` to `True` in your config file
+
+The rest of the code will work on both M4 and S3 boards.
+
 Original project documentation below (with some edits by me), I'm too lazy to add a new .gif:
 
 # Washington DC Metro Train Sign
@@ -30,7 +42,7 @@ This project contains the source code to create your own Washington DC Metro sig
 
 # How To
 ## Hardware
-- An [Adafruit Matrix Portal](https://www.adafruit.com/product/4745) - $24.99
+- An [Adafruit Matrix Portal](https://www.adafruit.com/product/4745) - $24.99 (Update: by an S3 instead of an M4)
 - A **64x32 RGB LED matrix** compatible with the _Matrix Portal_ - $39.99 _to_ $84.99
     - [64x32 RGB LED Matrix - 3mm pitch](https://www.adafruit.com/product/2279)
     - [64x32 RGB LED Matrix - 4mm pitch](https://www.adafruit.com/product/2278)
