@@ -1,5 +1,5 @@
 import time
-import gc
+import re
 
 from config import config
 from metro_api_common import MetroApiUtils
@@ -96,7 +96,15 @@ class MetroApiBus:
         api_url = config["wmata_api_bus_incident_url"] + str(bus_route)
         data = MetroApiUtils.query_api(wifi, api_url)
         print("Received bus incident response from WMATA api...")
-        incidents = [i["Description"] for i in data["BusIncidents"]]
+        incidents = []
+        for i in data["BusIncidents"]:
+            incident = self.clean_incident(i["Description"])
+            if str(bus_route) in i["Description"]:
+                incidents.append(incident)
+            else:
+                incidents.append(
+                    f"==={str(bus_route)}=== {incident} ==={str(bus_route)}==="
+                )
         return incidents
 
     def _fetch_bus_incidents_gtfs_rt(self, wifi, bus_lines):
@@ -121,8 +129,27 @@ class MetroApiBus:
                         if translation.get("language", "") == "en":
                             description = translation.get("text", "")
                             description = description.replace("\n", "")
+                            description = self.clean_incident(description)
+                            lines_affected = ', '.join(lines_affected)
+                            description = f"==={lines_affected}=== {description} ==={lines_affected}==="
                             filtered_incidents.append({"description": description})
         return filtered_incidents
+
+    def clean_incident(self, incident: str):
+        sentences = []
+        start_idx = 0
+        for i in range(len(incident) - 2):
+            if (
+                incident[i] == "."
+                and incident[i + 1] == " "
+                and incident[i + 2].isupper()
+            ):
+                sentences.append(incident[start_idx : i + 1].strip())
+                start_idx = i + 2
+        if start_idx < len(incident):
+            sentences.append(incident[start_idx:].strip())
+        clean = ". ".join([s for s in sentences if ".com" not in s])
+        return clean
 
     def _remove_vowels(self, text: str):
         vowels = "aeiouAEIOU"

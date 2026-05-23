@@ -121,7 +121,7 @@ class MetroApiTrain:
 
         return trains, incidents
 
-    def predict_trains(self, trains):
+    def predict_trains(self, trains) -> list[dict]:
         # Structure: stats[(line, dest, station, group)] = []
         print("Predicting trains...")
         stats = {}
@@ -150,7 +150,6 @@ class MetroApiTrain:
             while len(arrivals) < 6:
                 last_arrival += int(avg_interval)
                 arrivals.append(last_arrival)
-                print(f"new arrivals: {arrivals}")
 
                 new_train = {
                     "line_color": self.LINE_COLORS.get(key[0], self.DEFAULT_COLOR),
@@ -190,7 +189,6 @@ class MetroApiTrain:
         api_url = config["wmata_api_gtfs_rail_incident_url"]
         data = MetroApiUtils.query_api(wifi, api_url)
         print("Received rail incident response from WMATA api...")
-        print(f"all incidents: {data}")
 
         filtered_incidents = []
         for incident in data:

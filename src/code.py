@@ -1,37 +1,69 @@
 import time
 import rtc
+import board
+import neopixel
+import gc
 from os import getenv
 from config import config
 from train_board import TrainBoard, ErrorBoard
 from metro_api_common import MetroApiOnFireException
 from metro_api_train import MetroApiTrain
 from metro_api_bus import MetroApiBus
-import gc
 
-import busio
-import board
-from digitalio import DigitalInOut
-import neopixel
-
-# Use these imports for adafruit_esp32spi version 11.0.0 and up.
-# Note that frozen libraries may not be up to date.
-# import adafruit_esp32spi
-# from adafruit_esp32spi.wifimanager import WiFiManager
-from adafruit_esp32spi import adafruit_esp32spi
-from adafruit_esp32spi.adafruit_esp32spi_wifimanager import WiFiManager
-
-# Connect to Internet
-ssid = getenv("CIRCUITPY_WIFI_SSID")
-password = getenv("CIRCUITPY_WIFI_PASSWORD")
-esp32_cs = DigitalInOut(board.ESP_CS)
-esp32_ready = DigitalInOut(board.ESP_BUSY)
-esp32_reset = DigitalInOut(board.ESP_RESET)
-spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
-esp = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset)
-status_pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.2)
-wifi = WiFiManager(esp, ssid, password, status_pixel=status_pixel)
+BOARD_IS_M4 = "matrixportal_m4" in board.board_id
 REFRESH_INTERVAL = config["refresh_interval"]
 LAST_SYNC_TIME = -90000
+
+# Connect to internet
+ssid = getenv("CIRCUITPY_WIFI_SSID")
+password = getenv("CIRCUITPY_WIFI_PASSWORD")
+status_pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.2)
+if BOARD_IS_M4:
+    print("Detected MatrixPortal M4. Using ESP32 SPI...")
+    import busio
+    from digitalio import DigitalInOut
+
+    # Use these imports for adafruit_esp32spi version 11.0.0 and up.
+    # Note that frozen libraries may not be up to date.
+    # import adafruit_esp32spi
+    # from adafruit_esp32spi.wifimanager import WiFiManager
+    from adafruit_esp32spi import adafruit_esp32spi
+    from adafruit_esp32spi.adafruit_esp32spi_wifimanager import WiFiManager
+
+    esp32_cs = DigitalInOut(board.ESP_CS)
+    esp32_ready = DigitalInOut(board.ESP_BUSY)
+    esp32_reset = DigitalInOut(board.ESP_RESET)
+    spi = busio.SPI(board.SCK, board.MOSI, board.MISO)
+    esp = adafruit_esp32spi.ESP_SPIcontrol(spi, esp32_cs, esp32_ready, esp32_reset)
+    wifi_client = WiFiManager(esp, ssid, password, status_pixel=status_pixel)
+else:
+    print("Detected MatrixPortal S3. Using native Wi-Fi...")
+    import wifi as native_wifi
+    import socketpool
+    import ssl
+    import adafruit_requests
+
+    # Connect to the network natively
+    native_wifi.radio.connect(ssid, password)
+    pool = socketpool.SocketPool(native_wifi.radio)
+    requests = adafruit_requests.Session(pool, ssl.create_default_context())
+
+    class NativeWifiWrapper:
+        def __init__(self, requests, ssid, password):
+            self.requests = requests
+            self.ssid = ssid
+            self.password = password
+
+        def get(self, url, headers=None, timeout=10):
+            return self.requests.get(url, headers=headers, timeout=timeout)
+
+        def reset(self):
+            native_wifi.radio.enabled = False
+            time.sleep(REFRESH_INTERVAL)
+            native_wifi.radio.enabled = True
+            native_wifi.radio.connect(self.ssid, self.password)
+
+    wifi_client = NativeWifiWrapper(requests, ssid, password)
 
 # For telling time, get our username, api key, and desired timezone
 aio_username = getenv("aio_username")
@@ -51,7 +83,7 @@ def sync_rtc():
     while True:
         try:
             print("Syncing RTC with API...")
-            with wifi.get(time_api_url, timeout=10) as response:
+            with wifi_client.get(time_api_url, timeout=10) as response:
                 if response.status_code == 200:
                     now = response.text
                     date_str, time_str, _ = now.split(" ", 2)
@@ -87,6 +119,15 @@ def is_off_hours() -> bool:
         return after_end or before_start
     else:
         return after_end and before_start
+
+
+def reset_wifi():
+    print("WMATA API might be on fire. Resetting wifi ...")
+    if BOARD_IS_M4:
+        esp.reset()
+        time.sleep(REFRESH_INTERVAL)
+    wifi_client.reset()
+    time.sleep(REFRESH_INTERVAL)
 
 
 def validate_pages(config):
@@ -146,20 +187,12 @@ def validate_pages(config):
     print("Page validation successful")
 
 
-def reset_wifi():
-    print("WMATA API might be on fire. Resetting wifi ...")
-    esp.reset()
-    time.sleep(REFRESH_INTERVAL)
-    wifi.reset()
-    time.sleep(REFRESH_INTERVAL)
-
-
 def refresh_trains(trains: dict) -> list[list[dict], list[dict]]:
     found_trains = []
     incidents = []
     try:
         found_trains, incidents = train_api.fetch_train_predictions(
-            wifi,
+            wifi_client,
             trains["station_codes"],
             trains["train_groups"],
             trains.get("walking_times", []),
@@ -176,7 +209,7 @@ def refresh_buses(buses: dict) -> list[dict]:
     incidents = []
     try:
         found_buses, incidents = bus_api.fetch_bus_predictions(
-            wifi,
+            wifi_client,
             buses["bus_stop_codes"],
             buses.get("walking_times", []),
             buses.get("bus_lines", []),
@@ -214,11 +247,11 @@ except Exception as e:
     train_board = ErrorBoard(f"ERROR with config pages! {str(e)}")
 
 try:
-    PAGES = config["pages"]
+    pages = config["pages"]
     page_index = 0
     train_api = MetroApiTrain()
     bus_api = MetroApiBus()
-    train_board = TrainBoard(lambda: refresh(PAGES[page_index]))
+    train_board = TrainBoard(lambda: refresh(pages[page_index]))
     while True:
         start_time = time.monotonic()
         if OFF_HOURS_ENABLED and (start_time - LAST_SYNC_TIME > 86400):
@@ -231,7 +264,7 @@ try:
             print(f"Fetching page: {page_index + 1}")
             train_board.refresh()
             train_board.turn_on_display()
-            page_index = (page_index + 1) % len(PAGES)
+            page_index = (page_index + 1) % len(pages)
         duration = time.monotonic() - start_time
         time.sleep(max(REFRESH_INTERVAL - duration, 1))
         print(f"===================================Total update took: {duration:.2f}s")

@@ -56,19 +56,19 @@ config = {
     "wmata_api_rail_url": "http://api.wmata.com/StationPrediction.svc/json/GetPrediction/",
     "wmata_api_rail_incident_url": "http://api.wmata.com/Incidents.svc/json/Incidents",
     "wmata_api_gtfs_rail_incident_url": "https://api.wmata.com/gtfs-metro-alert/rail-gtfs-metro-alerts.json",
-    "use_gtfs_rt_for_rail_incidents": True,
+    "use_gtfs_rt_for_rail_incidents": True, # If using a M4 board, reccomend setting this to false
     ###############################
     # Metro Configuration - Bus   #
     ###############################
     "wmata_api_bus_url": "http://api.wmata.com/NextBusService.svc/json/jPredictions?StopID=",
     "wmata_api_bus_incident_url": "http://api.wmata.com/Incidents.svc/json/BusIncidents?Route=",
     "wmata_api_gtfs_bus_incident_url": "https://api.wmata.com/gtfs-metro-alert/bus-gtfs-metro-alerts.json",
-    "use_gtfs_rt_for_bus_incidents": False,
+    "use_gtfs_rt_for_bus_incidents": True, # If using a M4 board, reccomend setting this to false
     ###############################
     # Metro Configuration - Gen   #
     ###############################
     "metro_api_retries": 3,
-    "refresh_interval": 12,  # WMATA updates their APIs every 10-20 seconds. Set this proportional to how many pages and API requests you're making (limit 50,000 per 24 hrs)
+    "refresh_interval": 15,  # WMATA updates their APIs every 10-20 seconds. Set this proportional to how many pages and API requests you're making (limit 50,000 per 24 hrs)
     "show_all_if_none_walking": True,  # If there are no trains or buses you can get to in time, then show all trains/buses
     # Full station names mapped to abbreviations
     "station_mapping": {
@@ -93,7 +93,7 @@ config = {
     # Instructions at https://learn.adafruit.com/adafruit-magtag/getting-the-date-time
     # Time of day to turn board on and off - must be 24 hour format "HH:MM"
     "display_on_time": "07:00",
-    "display_off_time": "23:00",
+    "display_off_time": "23:30",
     #########################
     # Display Configuration #
     #########################
