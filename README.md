@@ -4,6 +4,7 @@ Forked from [metro-sign](https://github.com/metro-sign/dc-metro) to add the foll
 - Allow buses (each stop you want to track needs the regional code from [this map](https://opendata.dc.gov/datasets/DCGIS::metro-bus-stops/explore?location=38.923580%2C-77.046055%2C10))
 - Use a "page" system to mix and match any number of trains/buses
 - Optionally show metro rail and bus incidents
+- Optionally predict upcoming trains if the API doesn't return enough. Based on headways of returned trains
 - Implement a "walking distance" modifier to ignore trains/buses you cannot get to in time.
 - Errors/Crashes will (hopefully) display on the board
 - Updated to CircuitPython 10 and corresponding libraries.
