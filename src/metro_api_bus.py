@@ -1,5 +1,4 @@
 import time
-import re
 
 from config import config
 from metro_api_common import MetroApiUtils
@@ -15,7 +14,6 @@ class MetroApiBus:
         if len(walking_times) == 0:
             walking_times = [0] * len(bus_stops)
         bus_combos = list(zip(bus_stops, walking_times))
-        bus_lines = set(bus_lines)
         retries = config["metro_api_retries"]
 
         start_time = time.monotonic()
@@ -38,13 +36,25 @@ class MetroApiBus:
             bus_lines = set([b["loc"] for b in found_buses])
 
         incidents = []
-        if show_incidents and len(bus_lines) > 0:
+        if show_incidents:
             print("Fetching bus incidents...")
             if config["use_gtfs_rt_for_bus_incidents"]:
-                try:
-                    incidents = self._fetch_bus_incidents_gtfs_rt(wifi, bus_lines)
-                except Exception as e:
-                    pass
+                bus_directions = {}
+                for i, b in enumerate(found_buses):
+                    direction = b["destination"][-1]
+                    bus_directions.setdefault(b["loc"], set()).add(direction)
+                    if (
+                        i == 2
+                    ):  # only show incidents involving the 3 buses that will show on the board
+                        break
+                for attempt in range(retries + 1):
+                    try:
+                        incidents = self._fetch_bus_incidents_gtfs_rt(
+                            wifi, bus_directions
+                        )
+                        break
+                    except Exception as e:
+                        MetroApiUtils.maybe_retry(attempt, retries, str(e))
             else:
                 for route in bus_lines:
                     for attempt in range(retries + 1):
@@ -99,43 +109,77 @@ class MetroApiBus:
         incidents = []
         for i in data["BusIncidents"]:
             incident = self.clean_incident(i["Description"])
-            if str(bus_route) in i["Description"]:
-                incidents.append(incident)
-            else:
-                incidents.append(
-                    f"==={str(bus_route)}=== {incident} ==={str(bus_route)}==="
-                )
+            incidents.append(
+                f"==={str(bus_route)}=== {incident} ==={str(bus_route)}==="
+            )
         return incidents
 
-    def _fetch_bus_incidents_gtfs_rt(self, wifi, bus_lines):
+    def _fetch_bus_incidents_gtfs_rt(self, wifi, bus_directions):
         api_url = config["wmata_api_gtfs_bus_incident_url"]
         data = MetroApiUtils.query_api(wifi, api_url)
         print("Received bus incident response from WMATA api...")
 
-        filtered_incidents = []
+        bus_lines = set(bus_directions.keys())
+
+        incident_to_route_map = {}
         for incident in data:
             for entity in incident.get("entities", []):
                 alert = entity.get("alert", {})
-                lines_affected = set()
-                for info in alert.get("informedEntities", []):
-                    route_id = info.get("routeId")
-                    if route_id:
-                        lines_affected.add(route_id)
+                lines_affected = {
+                    info.get("routeId")
+                    for info in alert.get("informedEntities", [])
+                    if info.get("routeId")
+                }
 
-                if not lines_affected.isdisjoint(bus_lines):
-                    desc_obj = alert.get("descriptionText", {})
-                    translations = desc_obj.get("translations", [])
-                    for translation in translations:
-                        if translation.get("language", "") == "en":
-                            description = translation.get("text", "")
-                            description = description.replace("\n", "")
-                            description = self.clean_incident(description)
-                            lines_affected = ', '.join(lines_affected)
-                            description = f"==={lines_affected}=== {description} ==={lines_affected}==="
-                            filtered_incidents.append({"description": description})
-        return filtered_incidents
+                matched_lines = lines_affected & bus_lines
+                if not matched_lines:
+                    continue
 
-    def clean_incident(self, incident: str):
+                translations = alert.get("descriptionText", {}).get("translations", [])
+                description = next(
+                    (
+                        t.get("text", "")
+                        for t in translations
+                        if t.get("language") == "en"
+                    )
+                )
+                if not description or not self._incident_in_correct_direction(
+                    description, matched_lines, bus_directions
+                ):
+                    continue
+                description = self._clean_incident(description)
+                if description in incident_to_route_map:
+                    incident_to_route_map[description].update(matched_lines)
+                else:
+                    incident_to_route_map[description] = matched_lines
+
+        filtered_incidents = []
+        for incident, lines in incident_to_route_map.items():
+            lines_affected = ", ".join(sorted(lines))
+            description = f"==={lines_affected}=== {incident} ==={lines_affected}==="
+            filtered_incidents.append({"description": description})
+        return sorted(filtered_incidents, key=lambda x: x["description"])
+
+    def _incident_in_correct_direction(
+        self, incident: str, matched_lines: set, bus_directions: dict
+    ):
+        directions = {
+            "N": ["Northbound", "Southbound"],
+            "S": ["Southbound", "Northbound"],
+            "E": ["Eastbound", "Westbound"],
+            "W": ["Westbound", "Eastbound"],
+        }
+        for line in matched_lines:
+            for direction in bus_directions.get(line, []):
+                if (
+                    directions[direction][0] in incident
+                    or directions[direction][1] not in incident
+                ):
+                    return True
+        return False
+
+    def _clean_incident(self, incident: str):
+        incident = incident.replace("\n", "")
         sentences = []
         start_idx = 0
         for i in range(len(incident) - 2):
@@ -149,6 +193,7 @@ class MetroApiBus:
         if start_idx < len(incident):
             sentences.append(incident[start_idx:].strip())
         clean = ". ".join([s for s in sentences if ".com" not in s])
+        clean = clean.replace("..", ".")
         return clean
 
     def _remove_vowels(self, text: str):
@@ -162,8 +207,9 @@ class MetroApiBus:
         )
 
     def _normalize_bus_response(self, bus: dict, buff: int):
-        dest = f"{bus['RouteID']} - {bus['DirectionText'].split(' ')[0][0]}"  # C51-N
-        # dest = f"{bus['RouteID']}-{bus['DirectionText'].split(" ")[0]}" # C51-North
+        dest = f"{bus['RouteID']} - {bus['DirectionText'].split(' ')[0][0]}"  # C51 - N
+        # Note changing to one of the options below would mess up incident direction filtering
+        # dest = f"{bus['RouteID']}-{bus['DirectionText'].split(" ")[0]}" # C51 - North
         # dest = self._remove_vowels(f"{bus['DirectionText'].split(" to ")[1].strip()}") # Tnlytwn
 
         arrival = str(bus["Minutes"])

@@ -22,11 +22,6 @@ if BOARD_IS_M4:
     print("Detected MatrixPortal M4. Using ESP32 SPI...")
     import busio
     from digitalio import DigitalInOut
-
-    # Use these imports for adafruit_esp32spi version 11.0.0 and up.
-    # Note that frozen libraries may not be up to date.
-    # import adafruit_esp32spi
-    # from adafruit_esp32spi.wifimanager import WiFiManager
     from adafruit_esp32spi import adafruit_esp32spi
     from adafruit_esp32spi.adafruit_esp32spi_wifimanager import WiFiManager
 
@@ -43,7 +38,6 @@ else:
     import ssl
     import adafruit_requests
 
-    # Connect to the network natively
     native_wifi.radio.connect(ssid, password)
     pool = socketpool.SocketPool(native_wifi.radio)
     requests = adafruit_requests.Session(pool, ssl.create_default_context())
@@ -65,7 +59,7 @@ else:
 
     wifi_client = NativeWifiWrapper(requests, ssid, password)
 
-# For telling time, get our username, api key, and desired timezone
+
 aio_username = getenv("aio_username")
 aio_key = getenv("aio_key")
 location = getenv("timezone")
@@ -130,9 +124,11 @@ def reset_wifi():
     time.sleep(REFRESH_INTERVAL)
 
 
-def validate_pages(config):
+def validate_pages(config: dict):
+    if type(config) is not dict:
+        raise ValueError("Config file corrupted. Must be a dictionary")
     if "pages" not in config:
-        raise ValueError("config file is missing pages entry")
+        raise ValueError("Config file is missing pages entry")
     pages = config["pages"]
     if len(pages) == 0:
         raise ValueError("pages must have at least one entry in config file")
@@ -212,7 +208,7 @@ def refresh_buses(buses: dict) -> list[dict]:
             wifi_client,
             buses["bus_stop_codes"],
             buses.get("walking_times", []),
-            buses.get("bus_lines", []),
+            set(buses.get("bus_lines", [])),
             buses.get("show_incidents", False),
         )
     except MetroApiOnFireException:

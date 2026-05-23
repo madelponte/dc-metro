@@ -122,7 +122,6 @@ class MetroApiTrain:
         return trains, incidents
 
     def predict_trains(self, trains) -> list[dict]:
-        # Structure: stats[(line, dest, station, group)] = []
         print("Predicting trains...")
         stats = {}
         for train in trains:
@@ -138,16 +137,15 @@ class MetroApiTrain:
 
         projected = []
         for key, arrivals in stats.items():
-            if len(arrivals) > 1:
-                intervals = [
-                    arrivals[i] - arrivals[i - 1] for i in range(1, len(arrivals))
-                ]
-                avg_interval = sum(intervals) / len(intervals)
-            else:
-                avg_interval = arrivals[0]
+            if len(arrivals) <= 1:
+                continue
+            intervals = [arrivals[i] - arrivals[i - 1] for i in range(1, len(arrivals))]
+            avg_interval = sum(intervals) / len(intervals)
+            if avg_interval == 0:
+                avg_interval = 5
 
             last_arrival = arrivals[-1]
-            while len(arrivals) < 6:
+            while len(arrivals) < 5:
                 last_arrival += int(avg_interval)
                 arrivals.append(last_arrival)
 

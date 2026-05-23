@@ -20,7 +20,7 @@ config = {
     #             }
     # }
     #
-    # Neither 'trains' or 'buses' is required (max 1 of each per page) so you can mix and match however you like. Just be wary of the 50,000 daily API request limit
+    # Neither "trains" or "buses" is required (max 1 of each key per page) so you can mix and match however you like. Just be wary of the 50,000 daily API request limit
     ###########################################
     "pages": [
         {
@@ -56,14 +56,14 @@ config = {
     "wmata_api_rail_url": "http://api.wmata.com/StationPrediction.svc/json/GetPrediction/",
     "wmata_api_rail_incident_url": "http://api.wmata.com/Incidents.svc/json/Incidents",
     "wmata_api_gtfs_rail_incident_url": "https://api.wmata.com/gtfs-metro-alert/rail-gtfs-metro-alerts.json",
-    "use_gtfs_rt_for_rail_incidents": True, # If using a M4 board, reccomend setting this to false
+    "use_gtfs_rt_for_rail_incidents": True,  # If using a M4 board, recommend setting this to false
     ###############################
     # Metro Configuration - Bus   #
     ###############################
     "wmata_api_bus_url": "http://api.wmata.com/NextBusService.svc/json/jPredictions?StopID=",
     "wmata_api_bus_incident_url": "http://api.wmata.com/Incidents.svc/json/BusIncidents?Route=",
     "wmata_api_gtfs_bus_incident_url": "https://api.wmata.com/gtfs-metro-alert/bus-gtfs-metro-alerts.json",
-    "use_gtfs_rt_for_bus_incidents": True, # If using a M4 board, reccomend setting this to false
+    "use_gtfs_rt_for_bus_incidents": True,  # If using a M4 board, recommend setting this to false
     ###############################
     # Metro Configuration - Gen   #
     ###############################
