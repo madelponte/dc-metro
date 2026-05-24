@@ -144,7 +144,7 @@ class MetroApiBus:
                     )
                 )
                 if not description or not self._incident_in_correct_direction(
-                    description, matched_lines, bus_directions
+                    description.lower(), matched_lines, bus_directions
                 ):
                     continue
                 description = self._clean_incident(description)
@@ -164,10 +164,10 @@ class MetroApiBus:
         self, incident: str, matched_lines: set, bus_directions: dict
     ):
         directions = {
-            "N": ["Northbound", "Southbound"],
-            "S": ["Southbound", "Northbound"],
-            "E": ["Eastbound", "Westbound"],
-            "W": ["Westbound", "Eastbound"],
+            "N": ["northbound", "southbound"],
+            "S": ["southbound", "northbound"],
+            "E": ["eastbound", "westbound"],
+            "W": ["westbound", "eastbound"],
         }
         for line in matched_lines:
             for direction in bus_directions.get(line, []):
