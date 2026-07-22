@@ -1,6 +1,6 @@
 import time
+import gc
 import displayio
-import math
 from adafruit_display_shapes.rect import Rect
 from adafruit_display_text.label import Label
 from adafruit_matrixportal.matrix import Matrix
@@ -85,16 +85,29 @@ class TrainBoard:
 
     def _show_incidents(self, incidents):
         for incident in incidents:
-            self.heading_label.text = incident["description"]
-            time.sleep(1)
-            self._scroll(self.heading_label)
+            self._scroll_text(incident["description"])
+            gc.collect()
 
-    def _scroll(self, label):
-        label_width = math.ceil(label.bounding_box[2] / 64) * 64
-        while label.x > -label_width:
-            label.x = label.x - 1
-            time.sleep(config["scroll_delay"])
-        label.x = 0
+    def _scroll_text(self, text):
+        """Scroll text without creating a display object as wide as the message.
+
+        Label allocates display resources based on the complete text width.  GTFS
+        incident descriptions can be hundreds of characters long, so assigning a
+        whole description to one Label eventually fragments the CircuitPython
+        heap.  Keep the label bounded to slightly more than one matrix width.
+        """
+        character_width = config["character_width"]
+        window_size = config["matrix_width"] // character_width + 2
+        padded_text = text + (" " * window_size)
+
+        time.sleep(1)
+        for start in range(len(padded_text) - window_size + 1):
+            self.heading_label.text = padded_text[start : start + window_size]
+            self.heading_label.x = 0
+            for _ in range(character_width):
+                self.heading_label.x -= 1
+                time.sleep(config["scroll_delay"])
+        self.heading_label.x = 0
 
     def _hide_line(self, index: int):
         self.lines[index].hide()

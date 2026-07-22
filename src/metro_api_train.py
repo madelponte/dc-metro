@@ -1,4 +1,5 @@
 import time
+import gc
 
 from config import config
 from metro_api_common import MetroApiUtils
@@ -27,7 +28,7 @@ class MetroApiTrain:
     }
 
     def __init__(self):
-        pass
+        self._gtfs_incidents_disabled_due_to_memory = False
 
     def fetch_train_predictions(
         self,
@@ -72,9 +73,22 @@ class MetroApiTrain:
         incidents = []
         if show_incidents:
             train_colors = set(t["Line"] for t in data["Trains"])
-            if config["use_gtfs_rt_for_rail_incidents"]:
+            if (
+                config["use_gtfs_rt_for_rail_incidents"]
+                and not self._gtfs_incidents_disabled_due_to_memory
+            ):
                 try:
                     incidents = self._fetch_gtfs_rail_incidents(wifi, train_colors)
+                except MemoryError:
+                    # The all-system GTFS response is large. Do not retry the
+                    # same allocation; release it and use WMATA's smaller API.
+                    print("GTFS rail incidents exceeded available memory; using standard API")
+                    self._gtfs_incidents_disabled_due_to_memory = True
+                    gc.collect()
+                    try:
+                        incidents = self._fetch_rail_incidents(wifi, train_colors)
+                    except Exception as e:
+                        print(f"Error fetching fallback rail incidents: {e}")
                 except Exception as e:
                     print(f"Error fetching rail incidents: {e}")
             else:
@@ -179,7 +193,7 @@ class MetroApiTrain:
             {"description": i["Description"]} for i in filtered_incidents
         ]
 
-        print(f"Rail incidents found: {filtered_incidents}")
+        print(f"Rail incidents found: {len(filtered_incidents)}")
         return filtered_incidents
 
     def _fetch_gtfs_rail_incidents(self, wifi, train_colors) -> list:
@@ -208,7 +222,7 @@ class MetroApiTrain:
                             description = translation.get("text", "")
                             description = description.replace("\n", "")
                             filtered_incidents.append({"description": description})
-        print(f"Rail incidents found: {filtered_incidents}")
+        print(f"Rail incidents found: {len(filtered_incidents)}")
         return filtered_incidents
 
     def _train_arrival_map(self, arrival_time) -> int:
