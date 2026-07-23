@@ -47,6 +47,15 @@ class TrainBoard:
         self.heading_label.text = config["heading_text"]
         self.parent_group.append(self.heading_label)
 
+        # A second bounded label lets incident chunks be prepared off-screen.
+        # The two labels alternate as they cross the display, avoiding visible
+        # text rebuilds in the middle of the animation.
+        self.heading_label_2 = Label(config["font"], anchor_point=(0, 0))
+        self.heading_label_2.color = config["heading_color"]
+        self.heading_label_2.text = ""
+        self.heading_label_2.hidden = True
+        self.parent_group.append(self.heading_label_2)
+
         self.lines = []
         for i in range(config["num_lines"]):
             self.lines.append(Line(self.parent_group, i))
@@ -89,25 +98,57 @@ class TrainBoard:
             gc.collect()
 
     def _scroll_text(self, text):
-        """Scroll text without creating a display object as wide as the message.
+        """Smoothly scroll a message using two matrix-width text chunks.
 
-        Label allocates display resources based on the complete text width.  GTFS
-        incident descriptions can be hundreds of characters long, so assigning a
-        whole description to one Label eventually fragments the CircuitPython
-        heap.  Keep the label bounded to slightly more than one matrix width.
+        Rendering the whole incident consumes too much memory. Rebuilding a
+        short Label for every character is memory-safe but causes a visible
+        pause and position reset. Instead, move two labels every pixel and only
+        rebuild whichever label is already fully off-screen.
         """
         character_width = config["character_width"]
-        window_size = config["matrix_width"] // character_width + 2
-        padded_text = text + (" " * window_size)
+        chunk_size = config["matrix_width"] // character_width + 1
+        chunk_width = chunk_size * character_width
+        blank_chunk = " " * chunk_size
+        padded_text = text + blank_chunk
+        chunk_count = (len(padded_text) + chunk_size - 1) // chunk_size
 
-        time.sleep(1)
-        for start in range(len(padded_text) - window_size + 1):
-            self.heading_label.text = padded_text[start : start + window_size]
-            self.heading_label.x = 0
-            for _ in range(character_width):
-                self.heading_label.x -= 1
-                time.sleep(config["scroll_delay"])
+        gc.collect()
+        self.heading_label.text = padded_text[:chunk_size]
         self.heading_label.x = 0
+        self.heading_label_2.text = padded_text[chunk_size : chunk_size * 2]
+        self.heading_label_2.x = chunk_width
+        self.heading_label_2.hidden = False
+
+        next_chunk = 2
+        time.sleep(1)
+        for _ in range(chunk_count * chunk_width):
+            self.heading_label.x -= 1
+            self.heading_label_2.x -= 1
+
+            if self.heading_label.x <= -chunk_width:
+                start = next_chunk * chunk_size
+                self.heading_label.text = (
+                    padded_text[start : start + chunk_size]
+                    if next_chunk < chunk_count
+                    else blank_chunk
+                )
+                self.heading_label.x = self.heading_label_2.x + chunk_width
+                next_chunk += 1
+
+            if self.heading_label_2.x <= -chunk_width:
+                start = next_chunk * chunk_size
+                self.heading_label_2.text = (
+                    padded_text[start : start + chunk_size]
+                    if next_chunk < chunk_count
+                    else blank_chunk
+                )
+                self.heading_label_2.x = self.heading_label.x + chunk_width
+                next_chunk += 1
+
+            time.sleep(config["scroll_delay"])
+
+        self.heading_label.x = 0
+        self.heading_label_2.hidden = True
 
     def _hide_line(self, index: int):
         self.lines[index].hide()
