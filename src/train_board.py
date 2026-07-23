@@ -107,14 +107,18 @@ class TrainBoard:
         """
         character_width = config["character_width"]
         characters_per_matrix = config["matrix_width"] // character_width + 1
-        # Updating Label.text rebuilds its glyph display objects and briefly
-        # blocks animation. Two-matrix chunks make that work half as frequent
-        # while keeping memory use strictly bounded.
         chunk_size = characters_per_matrix * 2
         chunk_width = chunk_size * character_width
         blank_chunk = " " * chunk_size
         padded_text = text + blank_chunk
         chunk_count = (len(padded_text) + chunk_size - 1) // chunk_size
+
+        glyphs = bytearray()
+        for character in text:
+            code_point = ord(character)
+            if code_point < 128 and code_point not in glyphs:
+                glyphs.append(code_point)
+        config["font"].load_glyphs(glyphs)
 
         gc.collect()
         self.heading_label.text = padded_text[:chunk_size]
