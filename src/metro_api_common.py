@@ -32,8 +32,6 @@ class MetroApiUtils:
                     return response.json()
                 raise Exception(f"Server error: {response.status_code}")
         except MemoryError:
-            # Preserve allocation failures so callers can avoid retrying large
-            # GTFS payloads and fall back to WMATA's smaller incident APIs.
             raise
         except Exception as e:
             raise Exception(f"Network/Wifi error: {e}")

@@ -59,9 +59,6 @@ class MetroApiBus:
                         )
                         break
                     except MemoryError:
-                        # This endpoint contains alerts for the entire bus system
-                        # and can exhaust/fragment even the S3 heap. Retrying the
-                        # same allocation only makes recovery less likely.
                         print("GTFS bus incidents exceeded available memory; using standard API")
                         self._gtfs_incidents_disabled_due_to_memory = True
                         gc.collect()

@@ -80,8 +80,6 @@ class MetroApiTrain:
                 try:
                     incidents = self._fetch_gtfs_rail_incidents(wifi, train_colors)
                 except MemoryError:
-                    # The all-system GTFS response is large. Do not retry the
-                    # same allocation; release it and use WMATA's smaller API.
                     print("GTFS rail incidents exceeded available memory; using standard API")
                     self._gtfs_incidents_disabled_due_to_memory = True
                     gc.collect()

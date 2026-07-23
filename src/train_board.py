@@ -47,9 +47,6 @@ class TrainBoard:
         self.heading_label.text = config["heading_text"]
         self.parent_group.append(self.heading_label)
 
-        # A second bounded label lets incident chunks be prepared off-screen.
-        # The two labels alternate as they cross the display, avoiding visible
-        # text rebuilds in the middle of the animation.
         self.heading_label_2 = Label(config["font"], anchor_point=(0, 0))
         self.heading_label_2.color = config["heading_color"]
         self.heading_label_2.text = ""
