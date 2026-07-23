@@ -98,7 +98,7 @@ class TrainBoard:
             gc.collect()
 
     def _scroll_text(self, text):
-        """Smoothly scroll a message using two matrix-width text chunks.
+        """Smoothly scroll a message using two bounded text chunks.
 
         Rendering the whole incident consumes too much memory. Rebuilding a
         short Label for every character is memory-safe but causes a visible
@@ -106,7 +106,11 @@ class TrainBoard:
         rebuild whichever label is already fully off-screen.
         """
         character_width = config["character_width"]
-        chunk_size = config["matrix_width"] // character_width + 1
+        characters_per_matrix = config["matrix_width"] // character_width + 1
+        # Updating Label.text rebuilds its glyph display objects and briefly
+        # blocks animation. Two-matrix chunks make that work half as frequent
+        # while keeping memory use strictly bounded.
+        chunk_size = characters_per_matrix * 2
         chunk_width = chunk_size * character_width
         blank_chunk = " " * chunk_size
         padded_text = text + blank_chunk
@@ -121,6 +125,7 @@ class TrainBoard:
 
         next_chunk = 2
         time.sleep(1)
+        next_frame = time.monotonic()
         for _ in range(chunk_count * chunk_width):
             self.heading_label.x -= 1
             self.heading_label_2.x -= 1
@@ -145,7 +150,13 @@ class TrainBoard:
                 self.heading_label_2.x = self.heading_label.x + chunk_width
                 next_chunk += 1
 
-            time.sleep(config["scroll_delay"])
+            # Keep an absolute schedule. If replacing an off-screen chunk takes
+            # longer than one frame, subsequent frames catch up instead of the
+            # entire marquee permanently pausing.
+            next_frame += config["scroll_delay"]
+            sleep_for = next_frame - time.monotonic()
+            if sleep_for > 0:
+                time.sleep(sleep_for)
 
         self.heading_label.x = 0
         self.heading_label_2.hidden = True
