@@ -113,13 +113,6 @@ class TrainBoard:
         padded_text = text + blank_chunk
         chunk_count = (len(padded_text) + chunk_size - 1) // chunk_size
 
-        glyphs = bytearray()
-        for character in text:
-            code_point = ord(character)
-            if code_point < 128 and code_point not in glyphs:
-                glyphs.append(code_point)
-        config["font"].load_glyphs(glyphs)
-
         gc.collect()
         self.heading_label.text = padded_text[:chunk_size]
         self.heading_label.x = 0
