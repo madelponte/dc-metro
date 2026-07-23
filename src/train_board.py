@@ -1,6 +1,6 @@
 import time
+import gc
 import displayio
-import math
 from adafruit_display_shapes.rect import Rect
 from adafruit_display_text.label import Label
 from adafruit_matrixportal.matrix import Matrix
@@ -47,6 +47,12 @@ class TrainBoard:
         self.heading_label.text = config["heading_text"]
         self.parent_group.append(self.heading_label)
 
+        self.heading_label_2 = Label(config["font"], anchor_point=(0, 0))
+        self.heading_label_2.color = config["heading_color"]
+        self.heading_label_2.text = ""
+        self.heading_label_2.hidden = True
+        self.parent_group.append(self.heading_label_2)
+
         self.lines = []
         for i in range(config["num_lines"]):
             self.lines.append(Line(self.parent_group, i))
@@ -85,16 +91,69 @@ class TrainBoard:
 
     def _show_incidents(self, incidents):
         for incident in incidents:
-            self.heading_label.text = incident["description"]
-            time.sleep(1)
-            self._scroll(self.heading_label)
+            self._scroll_text(incident["description"])
+            gc.collect()
 
-    def _scroll(self, label):
-        label_width = math.ceil(label.bounding_box[2] / 64) * 64
-        while label.x > -label_width:
-            label.x = label.x - 1
-            time.sleep(config["scroll_delay"])
-        label.x = 0
+    def _scroll_text(self, text):
+        """Smoothly scroll a message using two bounded text chunks.
+
+        Rendering the whole incident consumes too much memory. Rebuilding a
+        short Label for every character is memory-safe but causes a visible
+        pause and position reset. Instead, move two labels every pixel and only
+        rebuild whichever label is already fully off-screen.
+        """
+        character_width = config["character_width"]
+        characters_per_matrix = config["matrix_width"] // character_width + 1
+        chunk_size = characters_per_matrix * 2
+        chunk_width = chunk_size * character_width
+        blank_chunk = " " * chunk_size
+        padded_text = text + blank_chunk
+        chunk_count = (len(padded_text) + chunk_size - 1) // chunk_size
+
+        gc.collect()
+        self.heading_label.text = padded_text[:chunk_size]
+        self.heading_label.x = 0
+        self.heading_label_2.text = padded_text[chunk_size : chunk_size * 2]
+        self.heading_label_2.x = chunk_width
+        self.heading_label_2.hidden = False
+
+        next_chunk = 2
+        time.sleep(1)
+        next_frame = time.monotonic()
+        for _ in range(chunk_count * chunk_width):
+            self.heading_label.x -= 1
+            self.heading_label_2.x -= 1
+
+            if self.heading_label.x <= -chunk_width:
+                start = next_chunk * chunk_size
+                self.heading_label.text = (
+                    padded_text[start : start + chunk_size]
+                    if next_chunk < chunk_count
+                    else blank_chunk
+                )
+                self.heading_label.x = self.heading_label_2.x + chunk_width
+                next_chunk += 1
+
+            if self.heading_label_2.x <= -chunk_width:
+                start = next_chunk * chunk_size
+                self.heading_label_2.text = (
+                    padded_text[start : start + chunk_size]
+                    if next_chunk < chunk_count
+                    else blank_chunk
+                )
+                self.heading_label_2.x = self.heading_label.x + chunk_width
+                next_chunk += 1
+
+            # Keep an absolute schedule. If replacing an off-screen chunk takes
+            # longer than one frame, subsequent frames catch up instead of the
+            # entire marquee permanently pausing.
+            next_frame += config["scroll_delay"]
+            sleep_for = next_frame - time.monotonic()
+            if sleep_for > 0:
+                time.sleep(sleep_for)
+
+        self.heading_label.x = 0
+        self.heading_label_2.hidden = True
 
     def _hide_line(self, index: int):
         self.lines[index].hide()

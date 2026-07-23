@@ -1,4 +1,5 @@
 import time
+import gc
 
 from config import config
 from metro_api_common import MetroApiUtils
@@ -6,7 +7,7 @@ from metro_api_common import MetroApiUtils
 
 class MetroApiBus:
     def __init__(self):
-        pass
+        self._gtfs_incidents_disabled_due_to_memory = False
 
     def fetch_bus_predictions(
         self, wifi, bus_stops, walking_times, bus_lines, show_incidents
@@ -38,7 +39,11 @@ class MetroApiBus:
         incidents = []
         if show_incidents:
             print("Fetching bus incidents...")
-            if config["use_gtfs_rt_for_bus_incidents"]:
+            use_standard_api = (
+                not config["use_gtfs_rt_for_bus_incidents"]
+                or self._gtfs_incidents_disabled_due_to_memory
+            )
+            if not use_standard_api:
                 bus_directions = {}
                 for i, b in enumerate(found_buses):
                     direction = b["destination"][-1]
@@ -53,9 +58,16 @@ class MetroApiBus:
                             wifi, bus_directions
                         )
                         break
+                    except MemoryError:
+                        print("GTFS bus incidents exceeded available memory; using standard API")
+                        self._gtfs_incidents_disabled_due_to_memory = True
+                        gc.collect()
+                        use_standard_api = True
+                        break
                     except Exception as e:
                         MetroApiUtils.maybe_retry(attempt, retries, str(e))
-            else:
+
+            if use_standard_api:
                 for route in bus_lines:
                     for attempt in range(retries + 1):
                         try:
@@ -64,7 +76,7 @@ class MetroApiBus:
                         except Exception as e:
                             MetroApiUtils.maybe_retry(attempt, retries, str(e))
                 incidents = [{"description": i} for i in set(incidents)]
-            print(f"Bus incidents found: {incidents}")
+            print(f"Bus incidents found: {len(incidents)}")
         duration = time.monotonic() - start_time
         print(f"Update took: {duration:.2f}s")
         return found_buses, incidents
@@ -108,7 +120,7 @@ class MetroApiBus:
         print("Received bus incident response from WMATA api...")
         incidents = []
         for i in data["BusIncidents"]:
-            incident = self.clean_incident(i["Description"])
+            incident = self._clean_incident(i["Description"])
             incidents.append(
                 f"==={str(bus_route)}=== {incident} ==={str(bus_route)}==="
             )

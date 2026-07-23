@@ -104,7 +104,7 @@ config = {
     "character_height": 6,
     "text_padding": 2,
     "text_color": 0xFF7500,
-    "scroll_delay": 0.006,
+    "scroll_delay": 0.02,
     "loading_destination_text": "Loading",
     "loading_min_text": "---",
     "loading_line_color": 0xFF00FF,  # Something something Purple Line joke
