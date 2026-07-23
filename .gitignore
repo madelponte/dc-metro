@@ -1,5 +1,8 @@
 .DS_Store
 .vscode
 
+__pycache__/
+*.py[cod]
+
 lib
 boot_out.txt
