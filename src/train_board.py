@@ -8,6 +8,17 @@ from adafruit_matrixportal.matrix import Matrix
 from config import config
 
 
+def _normalize_display_text(text):
+    """Use simple ASCII punctuation that remains clear in the 5x7 font."""
+    # Some WMATA responses arrive with the UTF-8 bytes for a smart quote
+    # decoded as Windows-1252 ("a-circumflex, euro, trademark") or Latin-1.
+    text = text.replace("\u00e2\u20ac\u2122", "'")
+    text = text.replace("\u00e2\u20ac\u02dc", "'")
+    text = text.replace("\u00e2\u0080\u0099", "'")
+    text = text.replace("\u00e2\u0080\u0098", "'")
+    return text.replace("\u2018", "'").replace("\u2019", "'").replace("\u02bc", "'")
+
+
 class TrainBoard:
     """
     get_new_data is a function that is expected to return a dictionary of arrays of dictionaries like this:
@@ -102,6 +113,7 @@ class TrainBoard:
         pause and position reset. Instead, move two labels every pixel and only
         rebuild whichever label is already fully off-screen.
         """
+        text = _normalize_display_text(text)
         character_width = config["character_width"]
         characters_per_matrix = config["matrix_width"] // character_width + 1
         chunk_size = characters_per_matrix * 2
@@ -236,6 +248,7 @@ class Line:
 
 class ErrorBoard:
     def __init__(self, error_msg):
+        error_msg = _normalize_display_text(error_msg)
         self.display = Matrix().display
         self.display.brightness = 1
         self.parent_group = displayio.Group()

@@ -94,11 +94,24 @@ This project contains the source code to create your own Washington DC Metro sig
     - The board will automatically flash the version of CircuitPython and remount as _CIRCUITPY_.
     - If something goes wrong, refer to the [Adafruit Documentation](https://learn.adafruit.com/adafruit-matrixportal-m4/install-circuitpython).
 
-3. Decompress the _lib.zip_ file for 10.x from this repository into the root of the _CIRCUITPY_ volume. There should be one folder named _lib_, with a plethora of files underneath. You can delete _lib.zip_ from the _CIRCUITPY_ volume, as it's no longer needed.
+3. Decompress the _lib.zip_ file for 10.x from this repository into the root of the _CIRCUITPY_ volume. There should be one folder named _lib_, containing the required library files. You can delete _lib.zip_ from the _CIRCUITPY_ volume, as it's no longer needed.
 
     - It has been reported that this step may fail ([Issue #2](https://github.com/metro-sign/dc-metro/issues/2)), most likely due to the storage on the Matrix Portal not being able to handle the decompression. If this happens, unzip the _lib.zip_ file on your computer, and copy the _lib_ folder to the Matrix Portal. Command line tools could also be used if the above doesn't work.
 
     ![Lib Decompressed](img/lib.png)
+
+    Maintainers can refresh `lib.zip` from the latest official CircuitPython
+    10.x MPY bundle by running:
+
+    ```sh
+    scripts/build_lib_bundle.sh
+    ```
+
+    This creates a minimal bundle containing only the libraries used by this
+    project. Use `--output PATH` to keep the existing archive, or
+    `--bundle-date YYYYMMDD` to reproduce a specific Adafruit bundle release.
+    When upgrading to a future CircuitPython major release, use
+    `--circuitpython-major N` to select its matching MPY bundle.
 
 4. Copy all of the Python files from _src_ in this repository into the root of the _CIRCUITPY_ volume.
 
