@@ -124,8 +124,10 @@ unzip -q "$ASSET_ARCHIVE" lib/5x7.bdf lib/LICENSE -d "$ASSET_DIR"
 
 mkdir -p \
     "$STAGE_DIR/lib/adafruit_bitmap_font" \
+    "$STAGE_DIR/lib/adafruit_bus_device" \
     "$STAGE_DIR/lib/adafruit_display_shapes" \
     "$STAGE_DIR/lib/adafruit_display_text" \
+    "$STAGE_DIR/lib/adafruit_esp32spi" \
     "$STAGE_DIR/lib/adafruit_matrixportal"
 
 required_bundle_files=(
@@ -136,10 +138,21 @@ required_bundle_files=(
     adafruit_bitmap_font/bitmap_font.mpy
     adafruit_bitmap_font/bdf.mpy
     adafruit_bitmap_font/glyph_cache.mpy
+    adafruit_bus_device/__init__.py
+    adafruit_bus_device/i2c_device.mpy
+    adafruit_bus_device/spi_device.mpy
     adafruit_display_shapes/__init__.py
     adafruit_display_shapes/rect.mpy
     adafruit_display_text/__init__.mpy
     adafruit_display_text/label.mpy
+    adafruit_esp32spi/__init__.mpy
+    adafruit_esp32spi/adafruit_esp32spi.mpy
+    adafruit_esp32spi/adafruit_esp32spi_socketpool.mpy
+    adafruit_esp32spi/adafruit_esp32spi_wifimanager.mpy
+    adafruit_esp32spi/digitalio.mpy
+    adafruit_esp32spi/PWMOut.mpy
+    adafruit_esp32spi/socketpool.mpy
+    adafruit_esp32spi/wifimanager.mpy
     adafruit_matrixportal/__init__.py
     adafruit_matrixportal/matrix.mpy
 )
