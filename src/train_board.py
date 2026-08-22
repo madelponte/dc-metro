@@ -10,6 +10,12 @@ from config import config
 
 def _normalize_display_text(text):
     """Use simple ASCII punctuation that remains clear in the 5x7 font."""
+    # Some WMATA responses arrive with the UTF-8 bytes for a smart quote
+    # decoded as Windows-1252 ("a-circumflex, euro, trademark") or Latin-1.
+    text = text.replace("\u00e2\u20ac\u2122", "'")
+    text = text.replace("\u00e2\u20ac\u02dc", "'")
+    text = text.replace("\u00e2\u0080\u0099", "'")
+    text = text.replace("\u00e2\u0080\u0098", "'")
     return text.replace("\u2018", "'").replace("\u2019", "'").replace("\u02bc", "'")
 
 
