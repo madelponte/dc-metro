@@ -122,13 +122,49 @@ unzip -q "$BUNDLE_ARCHIVE" -d "$WORK_DIR"
 # them before replacing lib.zip so the default in-place workflow is safe.
 unzip -q "$ASSET_ARCHIVE" lib/5x7.bdf lib/LICENSE -d "$ASSET_DIR"
 
-mkdir -p \
-    "$STAGE_DIR/lib/adafruit_bitmap_font" \
-    "$STAGE_DIR/lib/adafruit_display_shapes" \
-    "$STAGE_DIR/lib/adafruit_display_text" \
-    "$STAGE_DIR/lib/adafruit_matrixportal"
+mkdir -p "$STAGE_DIR/lib"
+
+# Copy complete packages rather than selected modules. Some package entry points
+# import sibling modules that are not obvious from this project's imports. For
+# example, bitmap_font.mpy imports every supported font parser at import time,
+# even though this project only opens a BDF file.
+required_bundle_directories=(
+    adafruit_bitmap_font
+    adafruit_bus_device
+    adafruit_display_shapes
+    adafruit_display_text
+    adafruit_esp32spi
+    adafruit_matrixportal
+)
 
 required_bundle_files=(
+    adafruit_connection_manager.mpy
+    adafruit_requests.mpy
+    neopixel.mpy
+)
+
+for relative_path in "${required_bundle_directories[@]}"; do
+    if [[ ! -d "$BUNDLE_LIB/$relative_path" ]]; then
+        echo "Error: required library directory is missing from the downloaded bundle: $relative_path" >&2
+        exit 1
+    fi
+    cp -R "$BUNDLE_LIB/$relative_path" "$STAGE_DIR/lib/"
+done
+
+for relative_path in "${required_bundle_files[@]}"; do
+    if [[ ! -f "$BUNDLE_LIB/$relative_path" ]]; then
+        echo "Error: required library is missing from the downloaded bundle: $relative_path" >&2
+        exit 1
+    fi
+    cp "$BUNDLE_LIB/$relative_path" "$STAGE_DIR/lib/"
+done
+
+cp "$ASSET_DIR/lib/5x7.bdf" "$ASSET_DIR/lib/LICENSE" "$STAGE_DIR/lib/"
+
+# Validate the known direct and transitive imports used by both the M4 and S3
+# startup paths. Keep this explicit so a future upstream package layout change
+# fails the build instead of producing an archive that fails on the board.
+required_project_files=(
     adafruit_connection_manager.mpy
     adafruit_requests.mpy
     neopixel.mpy
@@ -136,23 +172,28 @@ required_bundle_files=(
     adafruit_bitmap_font/bitmap_font.mpy
     adafruit_bitmap_font/bdf.mpy
     adafruit_bitmap_font/glyph_cache.mpy
-    adafruit_display_shapes/__init__.py
+    adafruit_bitmap_font/lvfontbin.mpy
+    adafruit_bitmap_font/pcf.mpy
+    adafruit_bitmap_font/ttf.mpy
+    adafruit_bus_device/spi_device.mpy
     adafruit_display_shapes/rect.mpy
     adafruit_display_text/__init__.mpy
     adafruit_display_text/label.mpy
-    adafruit_matrixportal/__init__.py
+    adafruit_esp32spi/__init__.mpy
+    adafruit_esp32spi/adafruit_esp32spi.mpy
+    adafruit_esp32spi/adafruit_esp32spi_socketpool.mpy
+    adafruit_esp32spi/adafruit_esp32spi_wifimanager.mpy
     adafruit_matrixportal/matrix.mpy
+    5x7.bdf
+    LICENSE
 )
 
-for relative_path in "${required_bundle_files[@]}"; do
-    if [[ ! -f "$BUNDLE_LIB/$relative_path" ]]; then
-        echo "Error: required library is missing from the downloaded bundle: $relative_path" >&2
+for relative_path in "${required_project_files[@]}"; do
+    if [[ ! -f "$STAGE_DIR/lib/$relative_path" ]]; then
+        echo "Error: required project library was not staged: $relative_path" >&2
         exit 1
     fi
-    cp "$BUNDLE_LIB/$relative_path" "$STAGE_DIR/lib/$relative_path"
 done
-
-cp "$ASSET_DIR/lib/5x7.bdf" "$ASSET_DIR/lib/LICENSE" "$STAGE_DIR/lib/"
 
 CANDIDATE_ARCHIVE="$WORK_DIR/lib.zip"
 (
